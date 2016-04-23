@@ -35,10 +35,10 @@ sub req
 
     # Check the outcome of the response
     if ($res->is_success) {
-        print $res->content;
+        return JSON::from_json($res->content);
     }
     else {
-       print $res->status_line, "\n";
+       die $res->status_line, "\n";
     }
 
 }
