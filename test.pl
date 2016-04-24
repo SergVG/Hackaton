@@ -5,4 +5,6 @@
 
  my $org = Webinar::Organization->new($API_KEY);
 
- print $org->members();
+use Data::Dumper;
+ print Dumper($org->members());
+print $org->getIdByEmail('sergvg@gmail.com');

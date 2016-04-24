@@ -4,11 +4,14 @@
 use strict;
 use warnings;
 use WWW::Telegram::BotAPI;
+use Webinar::Organization;
+my $API_KEY="d512e159cd8e9b42c636692bc498b6aa";
+use Data::Dumper;
 
 my $api = WWW::Telegram::BotAPI->new (
     token => (shift or die "ERROR: a token is required!\n")
 );
-#my $chats={};
+my $emails={};
 
 # Bump up the timeout when Mojo::UserAgent is used (LWP::UserAgent uses 180s by default)
 $api->agent->can ("inactivity_timeout") and $api->agent->inactivity_timeout (45);
@@ -19,35 +22,14 @@ my ($offset, $updates) = 0;
 # The commands that this bot supports.
 my $pic_id; # file_id of the last sent picture
 my $commands = {
-    "start"    => "Hello! Try: /whoami - /say - /lastphoto - /keyboard - /knock",
+    "start"    => "Hello! Сообщите свой email: /mail",
     # Example demonstrating the use of parameters in a command.
-    "say"      => sub { join " ", splice @_, 1 or "Usage: /say something" },
+    "email"      => \&email,
+    "analize"	=> \&analize,
     # Example showing how to use the result of an API call.
     "whoami"   => sub {
+	#print Dumper($_[0]);
         sprintf "Hello %s, I am %s! How are you?", shift->{from}{username}, $me->{result}{username}
-    },
-    # Example showing how to send multiple lines in a single message.
-    "knock"    => sub {
-        sprintf "Knock-knock.\n- Who's there?\n@%s!", $me->{result}{username}
-    },
-    # Example displaying a keyboard with some simple options.
-    "keyboard" => sub {
-        +{
-            text => "Here's a cool keyboard.",
-            reply_markup => JSON::MaybeXS::encode_json ({
-                keyboard => [ [ "a" .. "c" ], [ "d" .. "f" ], [ "g" .. "i" ] ],
-                one_time_keyboard => JSON::MaybeXS::JSON->true
-            })
-        }
-    },
-    # Example sending a photo with a known picture ID.
-    "lastphoto" => sub {
-        return "You didn't send any picture!" unless $pic_id;
-        +{
-            method  => "sendPhoto",
-            photo   => $pic_id,
-            caption => "Here it is!"
-        }
     },
     # Internal target called when a photo is received.
     "_photo" => sub { $pic_id = shift->{photo}[0]{file_id} },
@@ -101,4 +83,22 @@ sub _sendTextMessage {
         chat_id => shift->{message}{chat}{id},
         %{+shift}
     })
+}
+
+
+sub email { $emails->{shift->{from}{id}}=$_[1]; "$_[0] OK" }
+sub analize { 
+
+my $msg=shift;	
+if (!exists $emails->{$msg->{from}{id}}){
+"Введите ваш email с помощью команды /email"
+} else {
+  my $email=$emails->{$msg->{from}{id}};
+
+ my $org = Webinar::Organization->new($API_KEY);
+
+ return "Вы (${email}) не зарегистрированы как участник" unless  (defined $org->getIdByEmail($email));
+#Здесь нужно проанализировать что смотрел юзер и дать рекомендации что ещё посмотреть
+ 
+}
 }
