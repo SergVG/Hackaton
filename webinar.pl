@@ -31,15 +31,39 @@ use YAML;
 my $list =  $e->get_user_webinars(315467);
 
 my @viewed;
+my %my_ids;
 
 foreach my $ev (@$list) {
     foreach my $es (@{$ev->{eventSessions}}) {
+        $my_ids{$es->{eventId}} = 1;
         push @viewed, eventSessin_to_words($es);
     }
 }
 
 use Bag::Similarity::Cosine;
 
+my %neww;
+my $cosine = Bag::Similarity::Cosine->new;
+
+
+foreach my $ev (@{ $e->list }) {
+    next if $ev->{status}  eq 'STOP';
+    
+    foreach my $es (@{$ev->{eventSessions}}) {
+        next if exists $my_ids{ $es->{eventId} };
+        push @{$neww{ $es->{eventId} }{words}}, eventSessin_to_words($es);
+    }
+}
+
+foreach my $id (keys %neww) {
+    $neww{$id}{Similarity} = $cosine->from_bags(\@viewed, $neww{ $id }{words});
+}
+
+my @ranged = sort {
+                    $neww{$a}{Similarity} <=> $neww{$b}{Similarity}
+                  } keys %neww;
+
+warn Dumper(\%neww, \%my_ids);
 
 sub eventSessin_to_words
 {

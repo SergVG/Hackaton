@@ -22,10 +22,11 @@ my ($offset, $updates) = 0;
 # The commands that this bot supports.
 my $pic_id; # file_id of the last sent picture
 my $commands = {
-    "start"    => "Hello! Сообщите свой email: /mail",
+    "start"    => "Hello! Сообщите свой email командой: /email",
     # Example demonstrating the use of parameters in a command.
     "email"      => \&email,
     "analize"	=> \&analize,
+    "reg"	=> \&register,
     # Example showing how to use the result of an API call.
     "whoami"   => sub {
 	#print Dumper($_[0]);
@@ -86,7 +87,10 @@ sub _sendTextMessage {
 }
 
 
-sub email { $emails->{shift->{from}{id}}=$_[1]; "$_[0] OK" }
+sub email { $emails->{shift->{from}{id}}=$_[1]; "$_[0] OK\nSend /analize" }
+sub register {
+
+}
 sub analize { 
 
 my $msg=shift;	
@@ -96,9 +100,74 @@ if (!exists $emails->{$msg->{from}{id}}){
   my $email=$emails->{$msg->{from}{id}};
 
  my $org = Webinar::Organization->new($API_KEY);
+    
+    my $uid = $org->getIdByEmail($email);
+    return "Вы (${email}) не зарегистрированы как участник" unless  defined $uid;
 
- return "Вы (${email}) не зарегистрированы как участник" unless  (defined $org->getIdByEmail($email));
-#Здесь нужно проанализировать что смотрел юзер и дать рекомендации что ещё посмотреть
- 
+    #Здесь нужно проанализировать что смотрел юзер и дать рекомендации что ещё посмотреть
+
+    return 'Рекомендуем вебинары: '.join(', ', @{ recommendations($uid) });
+
 }
 }
+
+sub recommendations
+{
+    my ($uid) = $_;
+    use Webinar::Event;
+
+    my $e = Webinar::Event->new($API_KEY);
+
+    #Получаем список вебинаров юзера
+    my $list =  $e->get_user_webinars($uid);
+
+    my @viewed;
+    my %my_ids;
+
+    foreach my $ev (@$list) {
+        foreach my $es (@{$ev->{eventSessions}}) {
+            $my_ids{$es->{eventId}} = 1;
+            push @viewed, eventSessin_to_words($es);
+        }
+    }
+
+    use Bag::Similarity::Cosine;
+
+    my %neww;
+    my $cosine = Bag::Similarity::Cosine->new;
+
+
+    foreach my $ev (@{ $e->list }) {
+        next if $ev->{status}  eq 'STOP';
+        
+        foreach my $es (@{$ev->{eventSessions}}) {
+            next if exists $my_ids{ $es->{eventId} };
+            push @{$neww{ $es->{eventId} }{words}}, eventSessin_to_words($es);
+        }
+    }
+
+    foreach my $id (keys %neww) {
+        $neww{$id}{Similarity} = $cosine->from_bags(\@viewed, $neww{ $id }{words});
+    }
+
+    my @ranged = sort {
+                        $neww{$a}{Similarity} <=> $neww{$b}{Similarity}
+                      } keys %neww;
+
+    warn Dumper(\%neww, \%my_ids);
+
+    return \@ranged;
+}
+
+sub eventSessin_to_words
+{
+    my ($es) = @_;
+    my @texts;
+
+    push @texts, $es->{description};
+    push @texts, $es->{name};
+
+    return map {split /\s+/} @texts;
+}
+
+1;
