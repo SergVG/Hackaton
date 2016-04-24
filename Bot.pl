@@ -1,10 +1,14 @@
 #!/usr/bin/perl
-
+use utf8;
+use open ':encoding(utf8)';
+use open OUT => ':utf8';
 # Basic Telegram Bot implementation using WWW::Telegram::BotAPI
 use strict;
 use warnings;
+use Encode qw/encode_utf8 decode_utf8/;
 use WWW::Telegram::BotAPI;
 use Webinar::Organization;
+use Webinar::Contacts;
 my $API_KEY="d512e159cd8e9b42c636692bc498b6aa";
 use Data::Dumper;
 
@@ -25,11 +29,11 @@ my $commands = {
     "start"    => "Hello! Сообщите свой email командой: /email",
     # Example demonstrating the use of parameters in a command.
     "email"      => \&email,
-    "analize"	=> \&analize,
-    "reg"	=> \&register,
+    "analize"   => \&analize,
+    "invite"   => \&register,
     # Example showing how to use the result of an API call.
     "whoami"   => sub {
-	#print Dumper($_[0]);
+    #print Dumper($_[0]);
         sprintf "Hello %s, I am %s! How are you?", shift->{from}{username}, $me->{result}{username}
     },
     # Internal target called when a photo is received.
@@ -45,9 +49,9 @@ while (1) {
         timeout => 30, # Use long polling
         $offset ? (offset => $offset) : ()
     });
-#	for (keys %$chats){
-#		$api->sendMessage({chat_id=>$_,
-#			text=>'Ты здесь?'});
+#   for (keys %$chats){
+#       $api->sendMessage({chat_id=>$_,
+#           text=>'Ты здесь?'});
 #}
     unless ($updates and ref $updates eq "HASH" and $updates->{ok}) {
         warn "WARNING: getUpdates returned a false value - trying again...";
@@ -55,7 +59,7 @@ while (1) {
     }
     for my $u (@{$updates->{result}}) {
         $offset = $u->{update_id} + 1 if $u->{update_id} >= $offset;
-	#$chats->{$u->{message}{chat}{id}}=1;
+    #$chats->{$u->{message}{chat}{id}}=1;
         if (my $text = $u->{message}{text}) { # Text message
             printf "Incoming text message from \@%s\n", $u->{message}{from}{username};
             printf "Text: %s\n", $text;
@@ -89,26 +93,28 @@ sub _sendTextMessage {
 
 sub email { $emails->{shift->{from}{id}}=$_[1]; "$_[0] OK\nSend /analize" }
 sub register {
-
+"Try to register"
 }
 sub analize { 
 
-my $msg=shift;	
-if (!exists $emails->{$msg->{from}{id}}){
-"Введите ваш email с помощью команды /email"
-} else {
-  my $email=$emails->{$msg->{from}{id}};
+    my $msg=shift;  
 
- my $org = Webinar::Organization->new($API_KEY);
-    
-    my $uid = $org->getIdByEmail($email);
-    return "Вы (${email}) не зарегистрированы как участник" unless  defined $uid;
+    if (!exists $emails->{$msg->{from}{id}}){
+        "Введите ваш email с помощью команды /email"
+    } 
+    else {
+        my $email=$emails->{$msg->{from}{id}};
 
-    #Здесь нужно проанализировать что смотрел юзер и дать рекомендации что ещё посмотреть
+        my $org = Webinar::Organization->new($API_KEY);
+        my $contacts = Webinar::Contacts->new($API_KEY);
 
-    return 'Рекомендуем вебинары: '.join(', ', @{ recommendations($uid) });
+        my $uid = $org->getIdByEmail($email) || $contacts->getIdByEmail($email);
 
-}
+        #Здесь нужно проанализировать что смотрел юзер и дать рекомендации что ещё посмотреть
+
+        return 'Рекомендуем вебинары: '.join(', ', map {sprintf "%s /invite_%s\n", decode_utf8 ($_->[1]->{'name'}), $_->[0]} @{ recommendations($uid) });
+
+    }
 }
 
 sub recommendations
@@ -136,13 +142,13 @@ sub recommendations
     my %neww;
     my $cosine = Bag::Similarity::Cosine->new;
 
-
     foreach my $ev (@{ $e->list }) {
         next if $ev->{status}  eq 'STOP';
         
         foreach my $es (@{$ev->{eventSessions}}) {
             next if exists $my_ids{ $es->{eventId} };
             push @{$neww{ $es->{eventId} }{words}}, eventSessin_to_words($es);
+            $neww{ $es->{eventId} }{event} = $es;
         }
     }
 
@@ -150,13 +156,16 @@ sub recommendations
         $neww{$id}{Similarity} = $cosine->from_bags(\@viewed, $neww{ $id }{words});
     }
 
-    my @ranged = sort {
+    my @ranged =
+                map { [$_, $neww{ $_ }{event}]  }
+                sort {
                         $neww{$a}{Similarity} <=> $neww{$b}{Similarity}
                       } keys %neww;
 
-    warn Dumper(\%neww, \%my_ids);
+    warn Dumper(\@ranged);
 
     return \@ranged;
+
 }
 
 sub eventSessin_to_words

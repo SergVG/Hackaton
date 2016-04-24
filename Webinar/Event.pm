@@ -24,9 +24,19 @@ sub event_session_participations
     $self->req('GET', "/eventsessions/$eventSessionId/participations");
 }
 
+sub invite
+{
+    my ($self, $eventId, $email) = @_;
+    $self->req('POST', '/events/'.$eventId.'/invite', {eventId => $eventId,  
+                    isAutoEnter => 'true', sendEmail => 'true', 
+                    'users[0][email]' => $email});
+}
+
 sub get_user_webinars
 {
     my ($self, $userId) = @_;
+
+    return [] unless defined $userId;
 
     my %list = map { $_->{id} => $_ }  @{$self->list()};
 

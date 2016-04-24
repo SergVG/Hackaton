@@ -22,6 +22,17 @@ sub search
     $self->req('GET', $uri->as_string);
 }
 
+sub getIdByEmail{
+    my ($self, $email) =@_;
+    my $u;
+    
+    for $u (@{$self->search}){
+	    return $u->{userId} if ($u->{email} eq $email);
+    }
+
+    return undef;
+}
+
 sub create
 {
     my ($self, $uid, %params) = @_;
