@@ -9,6 +9,7 @@ use Encode qw/encode_utf8 decode_utf8/;
 use WWW::Telegram::BotAPI;
 use Webinar::Organization;
 use Webinar::Contacts;
+use Webinar::Event;
 my $API_KEY="d512e159cd8e9b42c636692bc498b6aa";
 use Data::Dumper;
 
@@ -64,7 +65,7 @@ while (1) {
             printf "Incoming text message from \@%s\n", $u->{message}{from}{username};
             printf "Text: %s\n", $text;
             next if $text !~ m!^/!; # Not a command
-            my ($cmd, @params) = split / /, $text;
+            my ($cmd, @params) = split /[ _]/, $text;
             my $res = $commands->{substr ($cmd, 1)} || $commands->{_unknown};
             # Pass to the subroutine the message object, and the parameters passed to the cmd.
             $res = $res->($u->{message}, @params) if ref $res eq "CODE";
@@ -93,7 +94,11 @@ sub _sendTextMessage {
 
 sub email { $emails->{shift->{from}{id}}=$_[1]; "$_[0] OK\nSend /analize" }
 sub register {
-"Try to register"
+  my $id = $_[1];
+  my $email = $emails->{$_[0]->{from}{id}};
+  my $e = new Webinar::Event($API_KEY);
+  eval {$e->invite($id,$email);};
+"Try to invite user $email to webinar $id";
 }
 sub analize { 
 
