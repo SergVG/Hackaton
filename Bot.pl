@@ -10,7 +10,7 @@ use WWW::Telegram::BotAPI;
 use Webinar::Organization;
 use Webinar::Contacts;
 use Webinar::Event;
-my $API_KEY="d512e159cd8e9b42c636692bc498b6aa";
+my $API_KEY="54629af83e687b92ac93ea72b86389df";
 use Data::Dumper;
 
 my $api = WWW::Telegram::BotAPI->new (
@@ -98,7 +98,7 @@ sub register {
   my $email = $emails->{$_[0]->{from}{id}};
   my $e = new Webinar::Event($API_KEY);
   eval {$e->invite($id,$email);};
-"Try to invite user $email to webinar $id";
+"Пытаемся пригласить  $email на вебинар $id. Проверьте почту";
 }
 sub analize { 
 
@@ -124,7 +124,7 @@ sub analize {
 
 sub recommendations
 {
-    my ($uid) = $_;
+    my ($uid) = @_;
     use Webinar::Event;
 
     my $e = Webinar::Event->new($API_KEY);
@@ -167,7 +167,7 @@ sub recommendations
                         $neww{$a}{Similarity} <=> $neww{$b}{Similarity}
                       } keys %neww;
 
-    warn Dumper(\@ranged);
+    #warn Dumper(\@ranged);
 
     return \@ranged;
 
